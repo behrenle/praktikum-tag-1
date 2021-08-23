@@ -1,4 +1,4 @@
-package vertexcover;
+package io.behrenle;
 
 import java.util.Set;
 /**
