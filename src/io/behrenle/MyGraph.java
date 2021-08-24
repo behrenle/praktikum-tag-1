@@ -6,22 +6,20 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class MyGraph implements Graph {
-    private Set<Integer> vertices;
-    private List<Edge> edges;
 
-    public MyGraph() {
-        edges = new ArrayList<Edge>();
-        vertices = new HashSet<Integer>();
+    private Map<Integer, Set<Integer>> adjacencyList;
+
+    MyGraph() {
+        adjacencyList = new HashMap<>();
     }
 
-    public MyGraph(Set<Integer> vertices, List<Edge> edges) {
-        this.vertices = vertices;
-        this.edges = edges;
+    MyGraph(Map<Integer, Set<Integer>> al) {
+        adjacencyList = new HashMap<>();
+        al.keySet().forEach(key -> adjacencyList.put(key, new HashSet<>(al.get(key))));
     }
 
     public MyGraph(String filename) {
-        edges = new ArrayList<Edge>();
-        vertices = new HashSet<Integer>();
+        this();
         File file = new File(filename);
         try {
             Scanner reader = new Scanner(file);
@@ -41,7 +39,7 @@ public class MyGraph implements Graph {
                     vertexIds.add(vertexName);
             }));
 
-            vertexIds.forEach((ignored) -> this.addVertex(this.vertices.size() - 1));
+            vertexIds.forEach((ignored) -> this.addVertex(adjacencyList.size()));
             splittedLines.forEach(edge -> {
                 if (edge.size() == 2)
                     this.addEdge(
@@ -56,88 +54,104 @@ public class MyGraph implements Graph {
 
     @Override
     public void addVertex(Integer v) {
-        vertices.add(v);
+        if (adjacencyList.containsKey(v))
+            throw new RuntimeException("Vertex already exists");
+
+        adjacencyList.put(v, new HashSet<>());
     }
 
     @Override
     public void addEdge(Integer v, Integer w) {
-        Edge newEdge = new Edge(v, w);
-        boolean duplicate = edges.stream()
-                .anyMatch(edge -> edge.equals(newEdge));
-
-        if (!duplicate)
-            edges.add(newEdge);
+        if (contains(v) && contains(w)) {
+            adjacencyList.get(v).add(w);
+            adjacencyList.get(w).add(v);
+        } else {
+            throw new RuntimeException("v or w does not exist");
+        }
     }
 
     @Override
     public void deleteVertex(Integer v) {
-        vertices.remove(v);
-        edges = edges.stream()
-                .filter(edge -> !edge.containsNode(v))
-                .collect(Collectors.toList());
+        if (!contains(v))
+            throw new RuntimeException("Vertex does not exist");
+
+        Set<Integer> neighbours = adjacencyList.get(v);
+        adjacencyList.remove(v);
+
+        neighbours.forEach(neighbour -> {
+            if (!contains(neighbour))
+                throw new RuntimeException("Neighbour does not exist " + neighbour);
+
+            adjacencyList.get(neighbour).remove(v);
+        });
     }
 
     @Override
     public void deleteEdge(Integer u, Integer v) {
-        Edge deletedEdge = new Edge(u, v);
-        edges = edges.stream()
-                .filter(e -> e.equals(deletedEdge))
-                .collect(Collectors.toList());
+        if (contains(u) && contains(v)) {
+            adjacencyList.get(u).remove(v);
+            adjacencyList.get(v).remove(u);
+        } else
+            throw new RuntimeException("Edge doesn't exist!");
     }
 
     @Override
     public boolean contains(Integer v) {
-        return vertices.contains(v);
+        return adjacencyList.containsKey(v);
     }
 
     @Override
     public int degree(Integer v) {
-        return (int) edges.stream()
-                .filter(e -> e.containsNode(v))
-                .count();
+        if (!contains(v))
+            throw new RuntimeException("Vertex doesn't exist!");
+
+        return adjacencyList.get(v).size();
     }
 
     @Override
     public boolean adjacent(Integer v, Integer w) {
-        return edges.stream()
-                .filter(e -> e.containsNode(v))
-                .anyMatch(e -> e.containsNode(w));
+        if (!contains(v) && !contains(w))
+            throw new RuntimeException("One of the vertex doesn't exist or both dont't exit!");
+
+        return adjacencyList.get(v).contains(w)
+                && adjacencyList.get(w).contains(v);
     }
 
     @Override
     public Graph getCopy() {
-        return new MyGraph(this.vertices, this.edges);
+        return new MyGraph(new HashMap<>(adjacencyList));
     }
 
     @Override
     public Set<Integer> getNeighbors(Integer v) {
-        return edges.stream()
-                .filter(e -> e.containsNode(v))
-                .map(e -> {
-                    if (e.getFirstNode() == v)
-                        return e.getSecondNode();
-                    return e.getFirstNode();
-                }).collect(Collectors.toSet());
+        if (!contains(v))
+            throw new RuntimeException("Vertex does not exist");
+
+        return adjacencyList.get(v);
     }
 
     @Override
     public int size() {
-        return vertices.size();
+        return adjacencyList.size();
     }
 
     @Override
     public int getEdgeCount() {
-        return edges.size();
+        var wrapper = new Object(){ int counter = 0; };
+        adjacencyList.keySet()
+                .forEach(vertexId -> {
+                    Set<Integer> neighbours = getNeighbors(vertexId);
+                    neighbours.forEach(neighbourId -> {
+                        if (neighbourId > vertexId)
+                            wrapper.counter++;
+                    });
+                });
+
+        return wrapper.counter;
     }
 
     @Override
     public Set<Integer> getVertices() {
-        return vertices;
+        return adjacencyList.keySet();
     }
-
-    /*
-    public List<Edge> getEdges() {
-        return edges;
-    }
-     */
 }
